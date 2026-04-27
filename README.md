@@ -85,7 +85,7 @@ IntrinsicEthics-SFT/
 ├── spotcheck_colab.py          # Cell 2.5: verifies data quality before training
 ├── finetune_colab.py           # Cell 3: SFT training (both conditions)
 ├── evaluate_colab.py           # Cell 4: full 5-config evaluation
-├── visualize_results.py        # Cell 7: generates results figure
+├── visualize_results.py        # Cell 5: generates results figure
 │
 ├── data/
 │   ├── raw/
