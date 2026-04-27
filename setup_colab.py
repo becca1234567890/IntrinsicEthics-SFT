@@ -2,10 +2,14 @@
 # CELL 1: INITIALIZATION — run this first every session
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# ── Verify GPU ────────────────────────────────────────────────────────────────
 import os
 import subprocess
-from google.colab import userdata
+from google.colab import drive, userdata
+
+# ── Mount Google Drive ────────────────────────────────────────────────────────
+drive.mount('/content/drive')
+
+# ── Verify GPU ────────────────────────────────────────────────────────────────
 result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total',
                        '--format=csv,noheader'], capture_output=True, text=True)
 print(f"GPU: {result.stdout.strip()}")
@@ -35,6 +39,23 @@ print(f"anthropic:      {anthropic.__version__}")
 print(f"accelerate:     {accelerate.__version__}")
 
 print(f"\nCUDA available: {torch.cuda.is_available()}")
+print(f"GPU:            {torch.cuda.get_device_name(0)}")
+print(f"VRAM:           {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+
+trl_ok = version.parse(trl.__version__) >= version.parse("0.8.0")
+dpo_ok = version.parse(trl.__version__) >= version.parse("0.8.6")
+print(f"\ntrl >= 0.8.0 (SFT): {'✓' if trl_ok else '✗ UPGRADE NEEDED'}")
+print(f"trl >= 0.8.6 (DPO): {'✓' if dpo_ok else '✗ UPGRADE NEEDED'}")
+
+# ── Verify API keys ───────────────────────────────────────────────────────────
+anthropic_key = userdata.get('ANTHROPIC_API_KEY')
+hf_token = userdata.get('HF_TOKEN')
+os.environ['HF_TOKEN'] = hf_token if hf_token else ''
+anthropic_key = userdata.get('ANTHROPIC_API_KEY')
+os.environ['ANTHROPIC_API_KEY'] = anthropic_key if anthropic_key else ''
+print(f"HF token:       {'✓' if hf_token else '✗ MISSING'}")
+print(f"Anthropic key:  {'✓' if anthropic_key else '✗ MISSING'}")
+print("\n✓ Initialization complete — ready to run experiment cells.")print(f"\nCUDA available: {torch.cuda.is_available()}")
 print(f"GPU:            {torch.cuda.get_device_name(0)}")
 print(f"VRAM:           {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
