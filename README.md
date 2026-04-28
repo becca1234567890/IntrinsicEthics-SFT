@@ -1,6 +1,6 @@
 # IntrinsicEthics-SFT
 
-**Exp02: Supervised fine-tuning study testing the load-bearing ethics hypothesis — intrinsic causal reasoning vs. deontic rule-checking, statistically confirmed.**
+**Exp02: Supervised fine-tuning study testing the load-bearing ethics hypothesis — intrinsic causal reasoning vs. filter rule-checking, statistically confirmed.**
 
 Part of the [Intrinsic Ethics](https://github.com/becca1234567890/AIIntrinsicEthics) research program.
 
@@ -18,6 +18,8 @@ This experiment tests that claim empirically using supervised fine-tuning on two
 
 ## Experiment Design
 
+> **Terminology note.** This repository uses *filter* throughout for Condition B (rule-based evaluation with pre-response `<thought>` and post-hoc `<safety_check>`). The accompanying paper uses *deontic* for the same condition, reflecting standard philosophical terminology. They refer to the same training condition and same trained adapter; the distinction is informal code-level vs. formal paper-level naming.
+
 **Base model:** Mistral-7B-Instruct-v0.3, 4-bit NF4 quantization, LoRA (r=16)  
 **Training data:** 900 examples per condition, sourced from human-curated benchmarks + generated reasoning chains  
 **Judge model:** `claude-haiku-4-5-20251001` (evaluation) + LlamaGuard-3-8B (independent R_J validation)  
@@ -28,11 +30,11 @@ This experiment tests that claim empirically using supervised fine-tuning on two
 | Condition | System prompt framing | Response structure |
 |---|---|---|
 | **Intrinsic (C)** | "Ethical consequence-modeling is part of how you reason, not a check you apply afterward." | `<reasoning>` 4-step causal chain → `<response>` |
-| **Deontic (B)** | Standard helpful-assistant | `<thought>` rule-based evaluation → `<response>` → `<safety_check>` post-hoc confirmation |
+| **Filter (B)** | Standard helpful-assistant | `<thought>` rule-based evaluation → `<response>` → `<safety_check>` post-hoc confirmation |
 
-The deontic condition trains rule-based evaluation as a pre-response check (`<thought>`), followed by the response itself, followed by a post-hoc safety confirmation (`<safety_check>`). The response is sandwiched between the two rule-evaluation stages.
+The filter condition trains rule-based evaluation as a pre-response check (`<thought>`), followed by the response itself, followed by a post-hoc safety confirmation (`<safety_check>`). The response is sandwiched between the two rule-evaluation stages.
 
-The intrinsic condition trains the model to trace causal chains to real-world outcomes *before* responding. The deontic condition trains rule-based evaluation as a pre-response check with post-hoc safety confirmation.
+The intrinsic condition trains the model to trace causal chains to real-world outcomes *before* responding. The filter condition trains rule-based evaluation as a pre-response check with post-hoc safety confirmation.
 
 ### Training Data Composition
 
@@ -50,12 +52,12 @@ Five configurations evaluated against held-out test sets:
 | Config | Description |
 |---|---|
 | Baseline | No adapter (base model only) |
-| Deontic | Base + deontic adapter |
+| Filter | Base + filter adapter |
 | **Intrinsic** | **Base + intrinsic adapter** |
 | Intrinsic Ablated | Intrinsic adapter selected then immediately disabled (exact base weights) |
-| Deontic Ablated | Deontic adapter selected then immediately disabled (control) |
+| Filter Ablated | Filter adapter selected then immediately disabled (control) |
 
-**Test sets:** 97 jailbreaks (HarmBench standard), 24 benign tasks, 76 edge cases (XSTest safe + OR-Bench), MMLU, 164 HumanEval problems
+**Test sets:** 80 HarmBench validation behaviors (N=60 non-copyright used for R_J/IES; N=20 copyright reported separately), 24 benign tasks, 76 edge cases (XSTest safe + OR-Bench), MMLU, 164 HumanEval problems
 
 ### Metrics
 
@@ -80,12 +82,11 @@ A model that refuses everything maximizes R_J but tanks U_T. A model that compli
 ```
 IntrinsicEthics-SFT/
 │
-├── setup_colab.py              # Cell 1: run this first every Colab session
-├── generate_data_colab.py      # Cell 2: sources prompts + generates reasoning chains
-├── spotcheck_colab.py          # Cell 2.5: verifies data quality before training
-├── finetune_colab.py           # Cell 3: SFT training (both conditions)
-├── evaluate_colab.py           # Cell 4: full 5-config evaluation
-├── visualize_results.py        # Cell 5: generates results figure
+├── 01_setup.py                       # Installs dependencies, verifies API keys
+├── 02_build_training_data.py         # Sources prompts from benchmarks + generates reasoning chains via Haiku API; produces train/test splits per condition
+├── 03_spotcheck.py                   # Manual verification of reasoning chain quality (samples, prints, flags)
+├── 04_train_and_evaluate.py          # SFT training (both conditions) + full 5-config evaluation + LlamaGuard R_J secondary pass
+├── 05_visualize.py                   # Generates results figure
 │
 ├── data/
 │   ├── raw/
@@ -94,7 +95,7 @@ IntrinsicEthics-SFT/
 │   │   ├── sourced_prompts_edge.jsonl        # 436 sourced edge case prompts
 │   │   └── all_scenarios.jsonl              # 1030 total scenarios
 │   └── processed/
-│       ├── train_condition_b.jsonl           # 900 deontic training examples
+│       ├── train_condition_b.jsonl           # 900 filter training examples
 │       ├── train_condition_c.jsonl           # 900 intrinsic training examples
 │       ├── test_jailbreaks.jsonl             # 30 held-out jailbreak prompts
 │       ├── test_benign.jsonl                 # 24 held-out benign prompts
@@ -112,33 +113,25 @@ IntrinsicEthics-SFT/
 
 ### Requirements
 
-- Google Colab Pro+ (Standard A100 40GB for Cells 3 and 4; L4 for Cells 1, 2, 2.5)
-- Anthropic API key (~$3-4 in credits for data generation + evaluation)
+- Google Colab Pro+ (L4 for steps 1-3; Standard A100 40GB for step 4; any runtime for step 5)
+- Anthropic API key (~$3-4 in Haiku credits across data generation and evaluation)
 - HuggingFace account with access to `mistralai/Mistral-7B-Instruct-v0.3`
 
 Store both keys as Colab Secrets (`ANTHROPIC_API_KEY`, `HF_TOKEN`) with notebook access enabled.
 
 ### Steps
 
-```
-1. Select L4 runtime. Run setup_colab.py (installs dependencies, verifies keys).
+| Step | Script | Runtime | Approx. time |
+|---|---|---|---|
+| 1 | `01_setup.py` | L4 | <1 min |
+| 2 | `02_build_training_data.py` | L4 | ~3 hr |
+| 3 | `03_spotcheck.py` | L4 | <1 min |
+| 4 | `04_train_and_evaluate.py` | A100 | ~16 hr |
+| 5 | `05_visualize.py` | any | <1 min |
 
-2. Run generate_data_colab.py (DRY_RUN=True first, then False)
-   — sources prompts from HarmBench/JailbreakBench/XSTest/Dolly/OR-Bench
-   — generates reasoning chains via Haiku API (~$3, ~2-3 hours)
-   — or skip and use provided data/ files with SKIP_DOWNLOAD=True
-
-3. Run spotcheck_colab.py to verify data quality.
-
-4. Switch to Standard A100 40GB runtime. Re-run setup_colab.py.
-
-5. Run finetune_colab.py (DRY_RUN=True first, then False) — ~23 min
-
-6. Run evaluate_colab.py (DRY_RUN=True first, then False)
-   — ~8-10 hours main evaluation + ~20 min LlamaGuard secondary pass
-
-7. Run visualize_results.py to generate the results figure.
-```
+**Notes:**
+- After step 3, switch the Colab runtime from L4 to Standard A100 40GB and re-run `01_setup.py` before proceeding to step 4.
+- `02_build_training_data.py` and `04_train_and_evaluate.py` each support `DRY_RUN=True` for a fast end-to-end smoke test. Run with `DRY_RUN=True` first, verify success, then re-run with `DRY_RUN=False` for the full execution.
 
 ---
 
