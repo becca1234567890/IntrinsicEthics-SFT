@@ -126,7 +126,7 @@ Store both keys as Colab Secrets (`ANTHROPIC_API_KEY`, `HF_TOKEN`) with notebook
 | 1 | `01_setup.py` | L4 | <1 min |
 | 2 | `02_build_training_data.py` | L4 | ~3 hr |
 | 3 | `03_spotcheck.py` | L4 | <1 min |
-| 4 | `04_train_and_evaluate.py` | A100 | ~24 hr |
+| 4 | `04_train_and_evaluate.py` | A100 | ~22 hr |
 | 5 | `05_visualize.py` | any | <1 min |
 
 **Notes:**
