@@ -22,15 +22,15 @@ Outputs:
     /content/drive/MyDrive/ethics_experiment/results/statistical_tests.txt
 
 Runtime:
-    Full run — A100 40GB | ~15 hr | Haiku API credits (judge)
-    Dry run  — A100 40GB | ~20 min | minimal API cost
+    Full run — A100 40GB | ~22 hr | Haiku API credits (judge)
+    Dry run  — A100 40GB | ~30 min | minimal API cost
                Loads base model, trains both adapters on a tiny subset,
                then runs a small sample through the full eval pipeline.
                Use this to verify the end-to-end pipeline before committing
                to the full run.
 
 Configuration:
-    DRY_RUN (top of file): True for ~20 min end-to-end smoke test, False for full run
+    DRY_RUN (top of file): True for ~30 min end-to-end smoke test, False for full run
 """
 
 # ┌─────────────────────────────────────────────────────────────────────────────┐
