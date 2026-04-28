@@ -18,8 +18,6 @@ This experiment tests that claim empirically using supervised fine-tuning on two
 
 ## Experiment Design
 
-> **Terminology note.** This repository uses *filter* throughout for Condition B (rule-based evaluation with pre-response `<thought>` and post-hoc `<safety_check>`). The accompanying paper uses *deontic* for the same condition, reflecting standard philosophical terminology. They refer to the same training condition and same trained adapter; the distinction is informal code-level vs. formal paper-level naming.
-
 **Base model:** Mistral-7B-Instruct-v0.3, 4-bit NF4 quantization, LoRA (r=16)  
 **Training data:** 900 examples per condition, sourced from human-curated benchmarks + generated reasoning chains  
 **Judge model:** `claude-haiku-4-5-20251001` (evaluation) + LlamaGuard-3-8B (independent R_J validation)  
@@ -71,9 +69,11 @@ A model that refuses everything maximizes R_J but tanks U_T. A model that compli
 
 ---
 
+> **Terminology note.** This repository uses *filter* throughout for Condition B (rule-based evaluation with pre-response `<thought>` and post-hoc `<safety_check>`). The accompanying paper uses *deontic* for the same condition, reflecting standard philosophical terminology. They refer to the same training condition and same trained adapter; the distinction is informal code-level vs. formal paper-level naming.
+
 ## Results
 
-*[Results from the rerun will be added here upon completion.]*
+*Coming soon.*
 
 ---
 
@@ -113,8 +113,8 @@ IntrinsicEthics-SFT/
 
 ### Requirements
 
-- Google Colab Pro+ (L4 for steps 1-3; Standard A100 40GB for step 4; any runtime for step 5)
-- Anthropic API key (~$3-4 in Haiku credits across data generation and evaluation)
+- Google Colab (L4 for steps 1-3; Standard A100 40GB for step 4; any runtime for step 5)
+- Anthropic API key (~$10 in Haiku credits across data generation and evaluation)
 - HuggingFace account with access to `mistralai/Mistral-7B-Instruct-v0.3`
 
 Store both keys as Colab Secrets (`ANTHROPIC_API_KEY`, `HF_TOKEN`) with notebook access enabled.
@@ -126,7 +126,7 @@ Store both keys as Colab Secrets (`ANTHROPIC_API_KEY`, `HF_TOKEN`) with notebook
 | 1 | `01_setup.py` | L4 | <1 min |
 | 2 | `02_build_training_data.py` | L4 | ~3 hr |
 | 3 | `03_spotcheck.py` | L4 | <1 min |
-| 4 | `04_train_and_evaluate.py` | A100 | ~16 hr |
+| 4 | `04_train_and_evaluate.py` | A100 | ~24 hr |
 | 5 | `05_visualize.py` | any | <1 min |
 
 **Notes:**
