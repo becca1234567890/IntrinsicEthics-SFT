@@ -1,7 +1,7 @@
 """
-IntrinsicEthics-SFT — Step 06: Results Visualization
+IntrinsicEthics-SFT — Step 05: Results Visualization
 
-Reads merged evaluation output and produces the four-panel results figure
+Reads evaluation output and produces the four-panel results figure
 used in the paper.
 
 Inputs:
@@ -40,20 +40,20 @@ else:
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ PATHS                                                                       │
 # └─────────────────────────────────────────────────────────────────────────────┘
-DRIVE_BASE  = Path("/content/drive/MyDrive/ethics_experiment")
-MERGED_FILE = DRIVE_BASE / "results" / "eval_progress_merged.json"
-OUT_FILE    = DRIVE_BASE / "results" / "sft_experiment_results.png"
+DRIVE_BASE    = Path("/content/drive/MyDrive/ethics_experiment")
+PROGRESS_FILE = DRIVE_BASE / "results" / "eval_progress.json"
+OUT_FILE      = DRIVE_BASE / "results" / "sft_experiment_results.png"
 
-if not MERGED_FILE.exists():
+if not PROGRESS_FILE.exists():
     raise FileNotFoundError(
-        f"eval_progress_merged.json not found at {MERGED_FILE}\n"
-        "Run evaluate_humaneval_only.py first."
+        f"eval_progress.json not found at {PROGRESS_FILE}\n"
+        "Run 04_train_and_evaluate.py first."
     )
 
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ LOAD DATA                                                                   │
 # └─────────────────────────────────────────────────────────────────────────────┘
-with open(MERGED_FILE) as f:
+with open(PROGRESS_FILE) as f:
     merged = json.load(f)
 
 results = merged["results"]

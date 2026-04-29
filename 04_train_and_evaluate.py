@@ -77,9 +77,13 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 if not ANTHROPIC_API_KEY:
     raise EnvironmentError("ANTHROPIC_API_KEY not set. Run the initialization cell first.")
 
-HF_TOKEN = os.environ.get("HF_TOKEN")
+try:
+    from google.colab import userdata as _userdata
+    HF_TOKEN = _userdata.get("HF_TOKEN")
+except Exception:
+    HF_TOKEN = os.environ.get("HF_TOKEN") or None
 if not HF_TOKEN:
-    raise EnvironmentError("HF_TOKEN not set. Run the initialization cell first.")
+    raise EnvironmentError("HF_TOKEN not set. Add it to Colab Secrets (🔑) or set the environment variable.")
 
 anthro = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 JUDGE_MODEL = "claude-haiku-4-5-20251001"
@@ -477,8 +481,19 @@ def _run_finetune():
     print(f"{'═' * 72}")
 
 
-def _ensure_adapters():
-    """Train adapters if the manifest is missing or any adapter directory is absent."""
+def _ensure_adapters(needed: set | None = None):
+    """Train adapters if any *needed* adapter is missing.
+
+    `needed` is a set of adapter keys from CONFIGS (e.g. {"filter_adapter"}).
+    Defaults to all required adapters when not supplied.
+    If none of the needed adapters are missing, returns immediately without
+    loading the base model or touching the GPU.
+    """
+    if needed is None:
+        needed = set(_REQUIRED_ADAPTERS)
+    adapters_to_check = [a for a in _REQUIRED_ADAPTERS if a in needed]
+    if not adapters_to_check:
+        return
     need_train = False
     if not _PATHS_MANIFEST.exists():
         need_train = True
@@ -486,27 +501,14 @@ def _ensure_adapters():
         _paths = json.loads(_PATHS_MANIFEST.read_text())
         need_train = any(
             not Path(_paths.get(a, "")).exists()
-            for a in _REQUIRED_ADAPTERS
+            for a in adapters_to_check
         )
     if need_train:
         _run_finetune()
 
 
-_ensure_adapters()
-
-ADAPTER_PATHS = json.loads(_PATHS_MANIFEST.read_text())
-for _adapter in _REQUIRED_ADAPTERS:
-    if _adapter not in ADAPTER_PATHS:
-        raise KeyError(
-            f"'{_adapter}' missing from adapter_paths.json after training — "
-            "check Obsolete/train.py output above for errors."
-        )
-    _p = Path(ADAPTER_PATHS[_adapter])
-    if not _p.exists():
-        raise FileNotFoundError(
-            f"Adapter '{_adapter}' registered at {_p} but directory not found "
-            "after training — check Obsolete/train.py output above for errors."
-        )
+# _ensure_adapters() is called after the early progress peek below,
+# once _needed_adapter_names is known.
 
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ SYSTEM PROMPTS  (one per condition)                                         │
@@ -546,6 +548,57 @@ CONFIGS = [
     {"id": "filter_ablated",    "label": "Config 5 — Filter Ablated",
      "adapter": "filter_adapter",    "ablate": True,  "sys_key": "filter"},
 ]
+
+# Maps CONFIGS["adapter"] key → the name used in model.set_adapter() / load_adapter()
+_ADAPTER_MODEL_NAME = {
+    "filter_adapter":    "filter",
+    "intrinsic_adapter": "intrinsic",
+}
+
+# ── Early progress peek — runs before any model loading ──────────────────────
+# Determines which configs are still pending so we only load/train what's needed.
+_PROGRESS_FILE = RES_DIR / "eval_progress.json"
+
+if DRY_RUN:
+    # Dry run always exercises all configs
+    _needed_adapter_names: set = {c["adapter"] for c in CONFIGS if c["adapter"]}
+    _remaining_configs = list(CONFIGS)
+else:
+    _completed_early: set = set()
+    if _PROGRESS_FILE.exists():
+        try:
+            _prog_raw = json.loads(_PROGRESS_FILE.read_text())
+            _completed_early = set(_prog_raw.get("completed", []))
+            _completed_early -= set(RERUN_CONFIGS)  # honour force-rerun overrides
+        except Exception:
+            pass   # unreadable progress → assume nothing done
+    _remaining_configs = [c for c in CONFIGS if c["id"] not in _completed_early]
+    _needed_adapter_names = {c["adapter"] for c in _remaining_configs if c["adapter"]}
+
+if not _remaining_configs:
+    print("\nAll configs already complete — nothing to do. Exiting.")
+    import sys as _sys; _sys.exit(0)
+
+print(f"Configs remaining : {[c['id'] for c in _remaining_configs]}")
+print(f"Adapters needed   : {sorted(_needed_adapter_names) or ['none (baseline only)']}\n",
+      flush=True)
+
+# Train any missing needed adapters (no-op if all present)
+_ensure_adapters(_needed_adapter_names)
+
+ADAPTER_PATHS = json.loads(_PATHS_MANIFEST.read_text())
+for _adapter in _REQUIRED_ADAPTERS:
+    if _adapter not in ADAPTER_PATHS:
+        raise KeyError(
+            f"'{_adapter}' missing from adapter_paths.json after training — "
+            "check _run_finetune() output above for errors."
+        )
+    _p = Path(ADAPTER_PATHS[_adapter])
+    if not _p.exists():
+        raise FileNotFoundError(
+            f"Adapter '{_adapter}' registered at {_p} but directory not found "
+            "after training — check _run_finetune() output above for errors."
+        )
 
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ HARDCODED JUDGE PROMPTS — from design document, do not vary                 │
@@ -771,7 +824,9 @@ def prepare_model_for_config(model, cfg_id: str, base_checksum: float):
     Requires adapters "filter" and "intrinsic" already attached via load_adapter.
     """
     if cfg_id == "baseline":
-        model.disable_adapter_layers()
+        # No-op if no adapters were loaded (plain AutoModelForCausalLM)
+        if hasattr(model, "disable_adapter_layers"):
+            model.disable_adapter_layers()
 
     elif cfg_id == "filter":
         model.enable_adapter_layers()
@@ -2153,8 +2208,8 @@ def _write_dry_run_eval_summary(fh, audit_all, pre_tok_by_cfg, all_flags):
 # ┌─────────────────────────────────────────────────────────────────────────────┐
 # │ PROGRESS                                                                    │
 # └─────────────────────────────────────────────────────────────────────────────┘
-_PROGRESS_FILE = RES_DIR / "eval_progress.json"
-
+# _PROGRESS_FILE defined earlier (after CONFIGS) so the early progress peek
+# and the full load_progress() function share the same path.
 
 def load_progress() -> dict:
     if not _PROGRESS_FILE.exists() or DRY_RUN:
@@ -2203,19 +2258,30 @@ try:
     he_tests   = load_humaneval_tests(dry_run=DRY_RUN)
     print()
 
-    # Load model and attach both adapters once — all 5 configs share this load
+    # Load model and attach only the adapters needed for remaining configs
     print("Loading model and attaching adapters (one-time)...")
     tokenizer = _load_tokenizer()
     model     = _load_base_weights()
     BASE_CHECKSUM = base_param_checksum(model)
     print(f"  Base checksum: {BASE_CHECKSUM}")
-    model = PeftModel.from_pretrained(
-        model, ADAPTER_PATHS["filter_adapter"], adapter_name="filter"
-    )
-    model.load_adapter(ADAPTER_PATHS["intrinsic_adapter"], adapter_name="intrinsic")
-    model.generation_config.max_new_tokens = None
-    model.generation_config.max_length     = None
-    print(f"  Adapters attached: filter, intrinsic")
+
+    _adapters_to_attach = sorted(_needed_adapter_names)   # deterministic order
+    if _adapters_to_attach:
+        first_key, *rest_keys = _adapters_to_attach
+        model = PeftModel.from_pretrained(
+            model, ADAPTER_PATHS[first_key],
+            adapter_name=_ADAPTER_MODEL_NAME[first_key],
+        )
+        for _key in rest_keys:
+            model.load_adapter(
+                ADAPTER_PATHS[_key], adapter_name=_ADAPTER_MODEL_NAME[_key],
+            )
+        model.generation_config.max_new_tokens = None
+        model.generation_config.max_length     = None
+        _attached = [_ADAPTER_MODEL_NAME[k] for k in _adapters_to_attach]
+        print(f"  Adapters attached: {', '.join(_attached)}")
+    else:
+        print(f"  No adapters needed (baseline-only run) — using plain base model.")
     print()
 
     # Load progress (allows resuming after a Colab disconnect)
