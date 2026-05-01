@@ -1,6 +1,6 @@
 # IntrinsicEthics-SFT
 
-**Exp02: Supervised fine-tuning study testing the load-bearing ethics hypothesis — intrinsic causal reasoning vs. filter rule-checking, statistically confirmed.**
+**Exp02: Supervised fine-tuning study comparing consequentialist (intrinsic) and rule-based (filter) safety-reasoning paradigms at LoRA-SFT scale.**
 
 Part of the [Intrinsic Ethics](https://github.com/becca1234567890/AIIntrinsicEthics) research program.
 
@@ -22,6 +22,8 @@ This experiment tests that claim empirically using supervised fine-tuning on two
 **Training data:** 900 examples per condition, sourced from human-curated benchmarks + generated reasoning chains  
 **Judge model:** `claude-haiku-4-5-20251001` (evaluation) + LlamaGuard-3-8B (independent R_J validation)  
 **Run date:** April 2026
+
+> **Note on initial vs. current findings.** The Anthropic Fellowship application submitted on April 25, 2026 referenced earlier results showing a load-bearing structural-integration differential between the consequentialist intrinsic and deontic filter conditions on cross-domain capability metrics. A self-directed methodology review the week following submission identified two evaluation-pipeline bugs that had produced spurious cross-domain capability differentials: an MMLU `max_new_tokens` truncation that prevented the trained adapters' pre-response templates from completing, and a HumanEval batched-inference padding artifact. The corrected evaluation pipeline shows no detectable cross-domain capability differential at SFT scale, and the current paper's findings — modest cost asymmetry favoring the intrinsic paradigm on subjective-task dimensions, with the load-bearing structural-integration test deferred to the planned DPO experiment (Exp03) — reflect this corrected analysis. Section 5.2 of the paper documents the methodology corrections explicitly.
 
 ### Training Conditions
 
@@ -113,7 +115,7 @@ IntrinsicEthics-SFT/
 
 ### Requirements
 
-- Google Colab (L4 for steps 1-3; Standard A100 40GB for step 4; any runtime for step 5)
+- Google Colab+ (L4 for steps 1-3; Standard A100 40GB for step 4; any runtime for step 5)
 - Anthropic API key (~$10 in Haiku credits across data generation and evaluation)
 - HuggingFace account with access to `mistralai/Mistral-7B-Instruct-v0.3`
 
